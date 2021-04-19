@@ -34,9 +34,9 @@ class App {
 
   async connectToDB() {
     try {
-      const res = await db.sync();
-    } catch (error) {
-      console.error("Unable to connect to the database:", error);
+      await db.sync();
+    } catch (err) {
+      this.app.use((next: NextFunction) => next(err));
     }
   }
 

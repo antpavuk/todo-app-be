@@ -31,7 +31,7 @@ export default class TodoController {
   static async getTodos(req: Request, res: Response, next: NextFunction) {
     try {
       const todos: ITodo[] = [];
-      (await Todo.findAll()).forEach(todo =>
+      (await Todo.findAll({ order: [["createdAt", "DESC"]] })).forEach(todo =>
         todos.push(dbTodoToClient(todo) as ITodo)
       );
 
@@ -97,7 +97,7 @@ export default class TodoController {
       }
 
       const todos: ITodo[] = [];
-      (await Todo.findAll()).forEach(todo =>
+      (await Todo.findAll({ order: [["createdAt", "DESC"]] })).forEach(todo =>
         todos.push(dbTodoToClient(todo) as ITodo)
       );
 
@@ -151,16 +151,17 @@ export default class TodoController {
       }
 
       const todosToDelete: ITodo[] = [];
-      (await Todo.findAll({ where: filter })).forEach(todo =>
-        todosToDelete.push(dbTodoToClient(todo) as ITodo)
-      );
+      (
+        await Todo.findAll({ where: filter, order: [["createdAt", "DESC"]] })
+      ).forEach(todo => todosToDelete.push(dbTodoToClient(todo) as ITodo));
 
       await Todo.destroy({ where: filter });
 
       const todos: ITodo[] = [];
-      (await Todo.findAll()).forEach(todo =>
+      (await Todo.findAll({ order: [["createdAt", "DESC"]] })).forEach(todo =>
         todosToDelete.push(dbTodoToClient(todo) as ITodo)
       );
+
       res.status(200).json({
         todosToDelete,
         todos,
