@@ -1,148 +1,172 @@
-import { IncomingMessage, ServerResponse } from "node:http";
-import Todo from "../models/todo";
-import getRequestQuery from "../utils/getRequestQuery";
-import isEmptyObj from "../utils/isEmptyObject";
+import { NextFunction, Request, Response } from "express";
+import { Todo } from "../models/todo";
+import HTTPException from "../types/HTTPException";
+import ITodo from "../types/ITodo";
+import clientTodoToDB from "../utils/clientTodoToDB";
+import dbTodoToClient from "../utils/dbTodoToClient";
 
-export async function addTodo(req: IncomingMessage, res: ServerResponse) {
-  try {
-    let body = "";
-
-    req
-      .on("error", err => {
-        console.log(err);
-      })
-      .on("data", chunk => {
-        body += chunk.toString();
-      })
-      .on("end", async () => {
-        const { value } = JSON.parse(body);
-
-        const todo = Todo.create(value);
-
-        res.writeHead(201, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ todo, message: "Todo was created" }));
+export default class TodoController {
+  static async addTodo(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { value } = req.body;
+      const newTodo = await Todo.create({
+        content: value,
+        activity_status: true,
       });
-  } catch (error) {
-    console.log(error);
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ message: "Internal server error" }));
-  }
-}
 
-export async function getTodos(req: IncomingMessage, res: ServerResponse) {
-  try {
-    const todos = Todo.findAll();
-
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ todos, message: "Todos were found" }));
-  } catch (error) {
-    console.log(error);
-    res.writeHead(400, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ message: "todos are not found" }));
-  }
-}
-
-export async function updateTodo(
-  req: IncomingMessage,
-  res: ServerResponse,
-  id: string
-) {
-  try {
-    let body = "";
-    req
-      .on("error", err => {
-        console.log(err);
-      })
-      .on("data", chunk => {
-        body += chunk.toString();
-      })
-      .on("end", async () => {
-        const todo = Todo.updateById(id, JSON.parse(body));
-
-        res.writeHead(200, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ todo, message: "Todo updated" }));
+      res.status(201).json({
+        todo: dbTodoToClient(newTodo),
+        message: "Todo was created",
       });
-  } catch (error) {
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ message: "Internal server error" }));
-    console.log(error);
-  }
-}
 
-export async function updateTodos(req: IncomingMessage, res: ServerResponse) {
-  try {
-    const query = getRequestQuery(req.url!);
-
-    if (query.action === "activate") {
-      const todos = Todo.updateAll({ isActive: true });
-
-      res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ todos, message: "Todos were updated" }));
-    } else if (query.action === "complete") {
-      const todos = Todo.updateAll({ isActive: false });
-
-      Todo.updateAll({ isActive: false });
-      res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ todos, message: "Todos were updated" }));
-    } else if (isEmptyObj(query)) {
-      let body = "";
-      req
-        .on("error", err => {
-          console.log(err);
-        })
-        .on("data", chunk => {
-          body += chunk.toString();
-        })
-        .on("end", async () => {
-          const todos = Todo.updateAll(JSON.parse(body));
-
-          res.writeHead(200, { "Content-Type": "application/json" });
-          return res.end(
-            JSON.stringify({ todos, message: "Todos were updated" })
-          );
-        });
+      next();
+    } catch (err) {
+      res.status(err.statusCode || 500).json({
+        message: err.message || "Internal server error.",
+      });
+      next(err);
     }
-  } catch (error) {
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ message: "Internal server error" }));
-    console.log(error);
   }
-}
 
-export async function deleteTodo(
-  req: IncomingMessage,
-  res: ServerResponse,
-  id: string
-) {
-  try {
-    const todo = Todo.removeById(id);
+  static async getTodos(req: Request, res: Response, next: NextFunction) {
+    try {
+      const todos: ITodo[] = [];
+      (await Todo.findAll()).forEach(todo =>
+        todos.push(dbTodoToClient(todo) as ITodo)
+      );
 
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ message: "Todo was deleted", todo }));
-  } catch (error) {
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ message: "Internal server error" }));
-    console.log(error);
+      res.status(200).json({
+        todos,
+        message: "Todos fetched succesfully!",
+      });
+
+      next();
+    } catch (err) {
+      res.status(err.statusCode || 500).json({
+        message: err.message || "Internal server error.",
+      });
+      next(err);
+    }
   }
-}
 
-export async function deleteTodos(req: IncomingMessage, res: ServerResponse) {
-  try {
-    const query = getRequestQuery(req.url!);
+  static async updateTodo(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
 
-    let filter =
-      query.isActive === "true" || query.isActive === "false"
-        ? { ...query, isActive: JSON.parse(query.isActive) }
-        : query;
+      // req.body loaded with values from todo
+      const bodyToUpdate = clientTodoToDB(req.body);
 
-    const todos = Todo.removeAll(filter);
+      const updatedTodo = await Todo.update(bodyToUpdate, { where: { id } });
 
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ todos, message: "Todos were deleted" }));
-  } catch (error) {
-    console.log(error);
+      if (updatedTodo[0] === 0)
+        throw new HTTPException(404, "Todo was not found!");
 
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ message: "Internal server error" }));
+      const todo = await Todo.findOne({ where: { id } });
+      res.status(200).json({
+        todo,
+        message: "Todo updated",
+      });
+
+      next();
+    } catch (err) {
+      res.status(err.statusCode || 500).json({
+        message: err.message || "Internal server error.",
+      });
+      next(err);
+    }
+  }
+
+  static async updateTodos(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { action } = req.query;
+      const bodyToUpdate = clientTodoToDB(req.body);
+
+      if (action === "activate") {
+        await Todo.update(
+          { activity_status: true },
+          { where: { activity_status: false } }
+        );
+      } else if (action === "complete") {
+        await Todo.update(
+          { activity_status: false },
+          { where: { activity_status: true } }
+        );
+      } else {
+        await Todo.update(bodyToUpdate, { where: {} });
+      }
+
+      const todos: ITodo[] = [];
+      (await Todo.findAll()).forEach(todo =>
+        todos.push(dbTodoToClient(todo) as ITodo)
+      );
+
+      res.status(200).json({
+        todos,
+        message: "Todos updated",
+      });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({
+        message: err.message || "Internal server error.",
+      });
+      next(err);
+    }
+  }
+
+  static async deleteTodo(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+
+      const todoToDelete = await Todo.findOne({ where: { id } });
+
+      if (!todoToDelete) throw new HTTPException(404, "Todo was not found!");
+
+      await Todo.destroy({ where: { id } });
+
+      res.status(200).json({
+        todo: todoToDelete,
+        message: "Todo deleted",
+      });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({
+        message: err.message || "Internal server error.",
+      });
+      next(err);
+    }
+  }
+
+  static async deleteTodos(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { query } = req;
+
+      const filter: {
+        content?: string;
+        activity_status?: boolean | string;
+      } = {};
+
+      if (query.isActive === "true") {
+        filter.activity_status = "true";
+      } else if (query.isActive === "false") {
+        filter.activity_status = "false";
+      }
+
+      const todosToDelete: ITodo[] = [];
+      (await Todo.findAll({ where: filter })).forEach(todo =>
+        todosToDelete.push(dbTodoToClient(todo) as ITodo)
+      );
+
+      await Todo.destroy({ where: filter });
+
+      res.status(200).json({
+        todos: todosToDelete,
+        message: "Todos deleted",
+      });
+
+      next();
+    } catch (err) {
+      res.status(err.statusCode || 500).json({
+        message: err.message || "Internal server error.",
+      });
+      next(err);
+    }
   }
 }

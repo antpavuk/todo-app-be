@@ -1,74 +1,47 @@
-import { createServer, IncomingMessage, ServerResponse } from "http";
-import * as dotenv from "dotenv";
-import {
-  addTodo,
-  deleteTodo,
-  deleteTodos,
-  getTodos,
-  updateTodo,
-  updateTodos,
-} from "./controllers/todos";
-import { URL, URLSearchParams } from "url";
-import HTTPMethods from "./types/HTTPMethods";
-import uuidMatch from "./utils/uuidMatch";
-dotenv.config();
+import express, { Application } from "express";
+import helmet from "helmet";
+import "dotenv/config";
+import cors from "cors";
+import TodoRoute from "./routes/todo";
+import db from "./database";
+import { defineTodo } from "./models/todo";
 
-const router = async (req: IncomingMessage, res: ServerResponse) => {
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS"
-  );
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Z-Key"
-  );
-  res.setHeader("Content-Type", "application/x-www-form-urlencoded");
+class App {
+  app: Application;
+  port: string | number;
 
-  if (req.method === "OPTIONS") {
-    res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
-      "Access-Control-Max-Age": 2592000,
-    });
-    res.end();
-    return;
+  constructor() {
+    this.app = express();
+    this.port = process.env.PORT || 4001;
+    this.config();
+    this.setRotes();
+    this.connectToDB();
+    this.start();
   }
 
-  console.log(req.url);
-  try {
-    const { method, url } = req;
-    const baseUrl = "/api/todos";
+  config() {
+    this.app.use(cors());
+    this.app.use(helmet());
+    this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(express.json());
+  }
 
-    if (url?.startsWith(baseUrl)) {
-      const urlIDParameter =
-        url?.split("/").length > 3 ? url?.split("/")[3] : "";
+  setRotes() {
+    this.app.use("/api/todos", new TodoRoute().router);
+  }
 
-      const urlIDParameterMatches = uuidMatch(urlIDParameter);
-
-      if (method === HTTPMethods.GET && url === baseUrl) {
-        await getTodos(req, res);
-      } else if (method === HTTPMethods.POST && url === baseUrl) {
-        await addTodo(req, res);
-        console.log(url);
-      } else if (method === HTTPMethods.PUT && urlIDParameterMatches) {
-        await updateTodo(req, res, urlIDParameter);
-      } else if (method === HTTPMethods.PUT) {
-        await updateTodos(req, res);
-      } else if (method === HTTPMethods.DELETE && urlIDParameterMatches) {
-        await deleteTodo(req, res, urlIDParameter);
-      } else if (method === HTTPMethods.DELETE) {
-        await deleteTodos(req, res);
-      }
+  async connectToDB() {
+    try {
+      const res = await db.sync();
+    } catch (error) {
+      console.error("Unable to connect to the database:", error);
     }
-  } catch (err) {
-    console.log(err);
   }
-};
 
-const server = createServer(router);
+  start() {
+    defineTodo();
+    this.app.listen(this.port);
+  }
+}
 
-const port = process.env.PORT || 4000;
-server.listen(port, () => {
-  console.log(port, process.env.NODE_ENV);
-});
+new App();
