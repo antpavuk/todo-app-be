@@ -1,10 +1,11 @@
-import express, { Application } from "express";
+import express, { Application, NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import "dotenv/config";
 import cors from "cors";
 import TodoRoute from "./routes/todo";
 import db from "./database";
 import { defineTodo } from "./models/todo";
+import HTTPException from "./types/HTTPException";
 
 class App {
   app: Application;
@@ -17,6 +18,7 @@ class App {
     this.setRotes();
     this.connectToDB();
     this.start();
+    this.app.use(this.errorHandler);
   }
 
   config() {
@@ -36,6 +38,19 @@ class App {
     } catch (error) {
       console.error("Unable to connect to the database:", error);
     }
+  }
+
+  errorHandler(
+    err: HTTPException,
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    if (res.headersSent) {
+      return next(err);
+    }
+    res.status(err.statusCode || 500);
+    res.render("error", { error: err });
   }
 
   start() {
