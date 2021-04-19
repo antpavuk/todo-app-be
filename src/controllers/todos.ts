@@ -56,14 +56,15 @@ export default class TodoController {
       // req.body loaded with values from todo
       const bodyToUpdate = clientTodoToDB(req.body);
 
-      const updatedTodo = await Todo.update(bodyToUpdate, { where: { id } });
+      const todoToUpdate = await Todo.update(bodyToUpdate, { where: { id } });
 
-      if (updatedTodo[0] === 0)
+      if (todoToUpdate[0] === 0)
         throw new HTTPException(404, "Todo was not found!");
 
-      const todo = await Todo.findOne({ where: { id } });
+      const updatedTodo = await Todo.findOne({ where: { id } });
+
       res.status(200).json({
-        todo,
+        todo: dbTodoToClient(updatedTodo!),
         message: "Todo updated",
       });
 
@@ -156,8 +157,13 @@ export default class TodoController {
 
       await Todo.destroy({ where: filter });
 
+      const todos: ITodo[] = [];
+      (await Todo.findAll()).forEach(todo =>
+        todosToDelete.push(dbTodoToClient(todo) as ITodo)
+      );
       res.status(200).json({
-        todos: todosToDelete,
+        todosToDelete,
+        todos,
         message: "Todos deleted",
       });
 
