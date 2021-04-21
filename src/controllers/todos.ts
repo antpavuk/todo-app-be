@@ -144,11 +144,8 @@ export default class TodoController {
         activity_status?: boolean | string;
       } = {};
 
-      if (query.isActive === "true") {
-        filter.activity_status = "true";
-      } else if (query.isActive === "false") {
-        filter.activity_status = "false";
-      }
+      if (query.isActive === "true" || query.isActive === "false")
+        filter.activity_status = query.isActive;
 
       const todosToDelete: ITodo[] = [];
       (
@@ -159,7 +156,7 @@ export default class TodoController {
 
       const todos: ITodo[] = [];
       (await Todo.findAll({ order: [["createdAt", "DESC"]] })).forEach(todo =>
-        todosToDelete.push(dbTodoToClient(todo) as ITodo)
+        todos.push(dbTodoToClient(todo) as ITodo)
       );
 
       res.status(200).json({
