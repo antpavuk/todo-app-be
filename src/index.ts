@@ -3,7 +3,7 @@ import helmet from "helmet";
 import "dotenv/config";
 import cors from "cors";
 import TodoRoute from "./routes/todo";
-import db from "./database";
+import db from "./db";
 import HTTPException from "./types/HTTPException";
 import UserRoute from "./routes/user";
 import morgan from "morgan";

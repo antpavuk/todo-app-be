@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import db from "../database";
+import db from "../db";
 import IUser from "../types/IUser";
 import { Todo } from "./todo";
 

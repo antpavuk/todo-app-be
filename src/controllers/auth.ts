@@ -41,12 +41,10 @@ export default class AuthController {
         age: parseInt(age),
       });
 
-      const { token, refreshToken } = setTokens(newUser.id);
-
-      newUser.refreshToken = refreshToken;
-      await newUser.save();
-
-      res.status(201).json({ token, refreshToken });
+      res.status(201).json({
+        message: "User created!",
+        user: newUser,
+      });
 
       next();
     } catch (err) {
