@@ -1,5 +1,6 @@
 import { Router } from "express";
-import TodoController from "../controllers/todos";
+import TodoController from "../controllers/todo";
+import { isAuth } from "../middleware/isAuth";
 
 export default class TodoRoute {
   router: Router;
@@ -10,11 +11,11 @@ export default class TodoRoute {
   }
 
   setPaths() {
-    this.router.post("/", TodoController.addTodo);
-    this.router.get("/", TodoController.getTodos);
-    this.router.put("/:id", TodoController.updateTodo);
-    this.router.put("/", TodoController.updateTodos);
-    this.router.delete("/:id", TodoController.deleteTodo);
-    this.router.delete("/", TodoController.deleteTodos);
+    this.router.post("/", isAuth, TodoController.addTodo);
+    this.router.get("/", isAuth, TodoController.getTodos);
+    this.router.put("/:id", isAuth, TodoController.updateTodo);
+    this.router.put("/", isAuth, TodoController.updateTodos);
+    this.router.delete("/:id", isAuth, TodoController.deleteTodo);
+    this.router.delete("/", isAuth, TodoController.deleteTodos);
   }
 }

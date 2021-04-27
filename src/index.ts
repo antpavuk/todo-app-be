@@ -4,8 +4,10 @@ import "dotenv/config";
 import cors from "cors";
 import TodoRoute from "./routes/todo";
 import db from "./database";
-import { defineTodo } from "./models/todo";
 import HTTPException from "./types/HTTPException";
+import UserRoute from "./routes/user";
+import morgan from "morgan";
+import AuthRoute from "./routes/auth";
 
 class App {
   app: Application;
@@ -24,12 +26,16 @@ class App {
   config() {
     this.app.use(cors());
     this.app.use(helmet());
+    this.app.use(morgan("dev"));
+
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(express.json());
   }
 
   setRotes() {
+    this.app.use("/api/auth", new AuthRoute().router);
     this.app.use("/api/todos", new TodoRoute().router);
+    this.app.use("/api/users", new UserRoute().router);
   }
 
   async connectToDB() {
@@ -54,7 +60,6 @@ class App {
   }
 
   start() {
-    defineTodo();
     this.app.listen(this.port);
   }
 }
